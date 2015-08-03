@@ -1,0 +1,299 @@
+<!DOCTYPE HTML>
+
+<html>
+
+<head>
+
+<title>Tetris</title>
+
+</head>
+
+<body>
+
+<div id="gameboard">
+	<canvas id="gameCanvas" width="440" height="420"></canvas>
+</div>
+
+<div id="Instructions">
+	<p>Please enter your next move:<br><br>
+		a: move left<br>
+		d: move right<br>
+		w: rotate piece counter-clockwise<br>
+		s: rotate piece clockwise<br><br><span style="color:red" id="prompt"></span></p>
+</div>
+
+<script type="text/javascript" src="pieces.js"></script>
+
+<script type="text/javascript">
+
+var gameGrid;
+var ROWS = 21;
+var COLS = 22;
+var SIZE = 20;
+var R_CCW = 1;  	// Rotate counter-clockwise
+var R_CW = -1;		// Rotate clockwise
+var M_RIGHT = 1;
+var M_LEFT = -1;
+var curPiece;		// Current piece
+var isGameOver;
+
+var game = new onReady;
+
+// Prepare the canvas and start the game initialisation
+function onReady()
+{
+	canvas = document.getElementById('gameCanvas');
+	ctx = canvas.getContext('2d');
+	ctx.font = "20px Arial";
+	promptMSG = document.getElementById('prompt');
+	initGame();
+
+	document.onkeydown = getInput;	
+}
+
+// Initialise the game grid and start the game
+function initGame()
+{
+	isGameOver = false;
+	gameGrid = new Array();
+	
+	for(var r = 0; r < ROWS; r++)
+	{
+		gameGrid[r] = new Array();
+		for(c = 0; c < COLS; c++)
+		{
+			if(c == 0 || c == (COLS - 1) || r == (ROWS - 1))
+				gameGrid[r][c] = 1;
+			else
+				gameGrid[r][c] = 0;
+		}
+	}
+	
+	curPiece = getNextPiece();
+	drawGrid(gameGrid, curPiece);
+}
+
+// Get user input and move the current piece if possible
+function getInput(e)
+{
+	if(!e)	{ var e = window.event; }
+	
+	e.preventDefault();
+	
+	promptMSG.innerHTML = "";
+	if(isGameOver != true)
+	{
+		var iDX, iDState;
+		switch(e.keyCode)
+		{
+			case 65:
+				iDX = M_LEFT;
+				iDState = 0;
+				break;
+				
+			case 68:
+				iDX = M_RIGHT;
+				iDState = 0;
+				break;
+
+			case 87:
+				iDX = 0;
+				iDState = R_CW;
+				break;
+			
+			case 83:
+				iDX = 0;
+				iDState = R_CCW;
+				break;
+		}
+		if( iDX === undefined ) 
+		{
+			promptMSG.innerHTML = "Please use one of the above controls (w,a,s,d)";
+		} 
+		else 
+		{
+			var newPiece;
+
+			if( iDX != 0 )
+				newPiece = curPiece.getMovedPiece(iDX);
+			if( iDState != 0)
+				newPiece = curPiece.getRotatedPiece(iDState);
+				
+			if(newPiece.isValid())
+			{
+				curPiece = newPiece;
+				if(!curPiece.isFinal())
+				{
+					curPiece.eachPoint(saveData);
+					curPiece = getNextPiece();
+					if(!curPiece.isFinal())
+						isGameOver = true;
+				}
+				drawGrid(gameGrid, curPiece);
+			}
+		}
+	}
+	else
+	{
+		alert('Game Over\n\nPlease refresh to start a new game');
+	}
+}
+
+// Draw the latest game grid
+function drawGrid(grid, piece)
+{
+	ctx.clearRect(0, 0, 440, 420);
+	
+	// Draw the grid
+    for(var r = 0; r < ROWS; r++)
+	{
+		for(var c = 0; c < COLS; c++)
+		{
+			if(grid[r][c] != 0)
+			{
+				ctx.fillText("*", c * SIZE, (r + 1) * SIZE, SIZE);
+			}
+		}
+	}
+	
+	// Draw the piece
+	piece.eachPoint(drawPiece);
+}
+
+// Draw the piece on the grid (canvas) based on the specified coordinates
+function drawPiece(iPosX, iPosY, isPlaced)
+{
+	if(isPlaced == 1)
+	{
+		ctx.fillText("*", iPosX * SIZE, (iPosY + 1) * SIZE, SIZE);
+	}
+}
+
+// Save the piece location data on the grid
+function saveData(iPosX, iPosY, isPlaced)
+{
+	if(isPlaced == 1)
+	{
+		gameGrid[iPosY][iPosX] = 1;
+	}
+}
+
+// Return the status of a specified cell on the grid
+function gridPoint(iPosX, iPosY)
+{
+	if(gameGrid[iPosY][iPosX] == undefined)
+		return undefined;
+	else
+		return gameGrid[iPosY][iPosX];
+}
+
+// A function for the TDD process
+// Uses a number of tests to check if the code is working fine
+// with the latest changes
+function test()
+{
+	// test() makes use of the original gameGrid as
+	// some functions were designed to specifically update
+	// the global gameGrid variable, i.e. gridPoint()
+	var grid = gameGrid;
+	// create a sample L Piece
+	var states = [
+					[ [1, 0],
+			  		  [1, 0],
+			  		  [1, 1] ],
+
+					[ [1, 1, 1],
+					  [1, 0, 0] ],
+
+					[ [1, 1],
+					  [0, 1],
+					  [0, 1] ],
+
+					[ [0, 0, 1],
+					  [1, 1, 1] ]
+				 ];
+	
+	var piece = new Piece(states);
+	var piece2 = new Piece(states);
+
+	// test that when a piece is placed outside the grid, it fails validation
+	piece.posX = -10;
+	console.assert(!piece.isValid(), "Test 1 - piece is outside of the grid (Left boundary)");
+	restartPiece(piece);
+
+	piece.posX = 30;
+	console.assert(!piece.isValid(), "Test 2 - piece is outside of the grid (Right boundary)");
+	restartPiece(piece);
+
+	piece.posY = 30;
+	console.assert(!piece.isValid(), "Test 3 - piece is outside of the grid (Bottom boundary)");
+	restartPiece(piece);
+
+	// test that when a piece is intersecting grid broders, it fails validation
+
+	piece.posX = 0;
+	console.assert(!piece.isValid(), "Test 4 - piece is intersecting left grid border");
+	restartPiece(piece);
+
+	piece.posX = COLS - 1;
+	console.assert(!piece.isValid(), "Test 5 - piece is intersecting right grid border");
+	restartPiece(piece);
+
+	piece.posY = ROWS - 1;
+	console.assert(!piece.isValid(), "Test 6 - piece is intersecting bottom grid border");
+	restartPiece(piece);
+
+	// test that when a piece overlaps another piece on the grid, it fails validation
+	piece2.posX = 10;
+	piece2.posY = 12;
+	piece2.eachPoint(saveData); // save piece on the grid
+	console.assert(!piece.isValid(), "Test 7 - piece is overlapping piece2");
+	piece2.eachPoint(clearData);
+
+	// test that a piece can correctly identify its final position (L Piece in a bottom left corner)
+	// i.e. has no more acceptable further actions
+	piece.posX = 1;
+	piece.posY = ROWS - 3;
+	piece.state = 3;
+	console.assert(!piece.isFinal(), "Test 8 - piece is in its final position");
+
+	// test that a piece can correctly identify its final position (L Piece in a bottom right corner)
+	piece.posX = COLS - 4;
+	piece.posY = ROWS - 3;
+	piece.state = 3;
+	console.assert(!piece.isFinal(), "Test 9 - piece is in its final position");
+
+	// test that a piece can correctly identify its final position (L Piece in a bottom left corner
+	// but on top of another piece this time)
+	piece2.posX = 1;
+	piece2.posY = ROWS - 3;
+	piece2.state = 3;
+	piece2.eachPoint(saveData);
+
+	piece.posX = 1;
+	piece.posY = ROWS - 4;
+	piece.state = 1;
+	console.assert(!piece.isFinal(), "Test 10 - piece is in its final position");
+	piece2.eachPoint(clearData);
+
+	function restartPiece(p)
+	{
+		p.posX = 10;	// Acceptable X coordinate
+		p.posY = 10;	// Acceptable Y coordinate
+		p.state = 0;
+	}
+
+	function clearData(x, y, isPlaced)
+	{
+		if(isPlaced)
+			grid[y][x] = 0;
+	}
+}
+
+test();
+
+</script>
+
+</body>
+	
+</html>
